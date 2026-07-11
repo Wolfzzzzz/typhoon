@@ -3131,54 +3131,67 @@
      70
     ]
    }
+  },
+  {
+   "time": "2026-07-11 16:00",
+   "ts": 1783785600000,
+   "level": "TY",
+   "level_cn": "台风",
+   "lon": 121.1,
+   "lat": 28.3,
+   "pressure": 960,
+   "wind": 38,
+   "move_dir": "NW",
+   "move_speed": 28,
+   "radii": {}
   }
  ],
  "forecast": [
   {
    "hour": 6,
-   "time": "202607111500",
-   "lon": 120.3,
-   "lat": 29.1,
-   "pressure": 975,
+   "time": "202607111600",
+   "lon": 120.1,
+   "lat": 29.2833,
+   "pressure": 980,
    "wind": 33,
    "level": "TY",
    "level_cn": "台风"
   },
   {
    "hour": 12,
-   "time": "202607111500",
-   "lon": 119.1,
-   "lat": 30.2,
-   "pressure": 982,
-   "wind": 25,
-   "level": "STS",
-   "level_cn": "强热带风暴"
+   "time": "202607111600",
+   "lon": 119.0167,
+   "lat": 30.3333,
+   "pressure": 985,
+   "wind": 23,
+   "level": "TS",
+   "level_cn": "热带风暴"
   },
   {
    "hour": 18,
-   "time": "202607111500",
-   "lon": 118.6,
-   "lat": 31,
-   "pressure": 990,
+   "time": "202607111600",
+   "lon": 118.5333,
+   "lat": 31.1167,
+   "pressure": 995,
    "wind": 20,
    "level": "TS",
    "level_cn": "热带风暴"
   },
   {
    "hour": 24,
-   "time": "202607111500",
-   "lon": 118.2,
-   "lat": 31.7,
-   "pressure": 995,
+   "time": "202607111600",
+   "lon": 118.175,
+   "lat": 31.8417,
+   "pressure": 998,
    "wind": 18,
    "level": "TS",
    "level_cn": "热带风暴"
   },
   {
    "hour": 36,
-   "time": "202607111500",
-   "lon": 117.9,
-   "lat": 33.4,
+   "time": "202607111600",
+   "lon": 117.9583,
+   "lat": 33.525,
    "pressure": 998,
    "wind": 18,
    "level": "TS",
@@ -3186,9 +3199,9 @@
   },
   {
    "hour": 48,
-   "time": "202607111500",
-   "lon": 118.6,
-   "lat": 34.9,
+   "time": "202607111600",
+   "lon": 118.7667,
+   "lat": 35.0833,
    "pressure": 998,
    "wind": 18,
    "level": "TS",
@@ -3196,9 +3209,9 @@
   },
   {
    "hour": 60,
-   "time": "202607111500",
-   "lon": 120.6,
-   "lat": 37.1,
+   "time": "202607111600",
+   "lon": 120.8333,
+   "lat": 37.2417,
    "pressure": 998,
    "wind": 18,
    "level": "TS",
@@ -3206,15 +3219,15 @@
   },
   {
    "hour": 72,
-   "time": "202607111500",
-   "lon": 123.4,
-   "lat": 38.8,
+   "time": "202607111600",
+   "lon": 123.6333,
+   "lat": 38.9417,
    "pressure": 998,
    "wind": 18,
    "level": "TS",
    "level_cn": "热带风暴"
   }
  ],
- "generated_at": "2026-07-12 00:06:46",
+ "generated_at": "2026-07-12 00:18:54",
  "source": "nmc-snapshot"
 }
