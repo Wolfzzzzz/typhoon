@@ -186,7 +186,9 @@ function updatePanel(d, last) {
 // === nmc 直连（无需后端）：fetch + JSONP 兜底 ===
 function unwrap(raw){
   const i = raw.indexOf("(");
+  if (i < 0) return JSON.parse(raw);
   let rest = raw.slice(i + 1);
+  while (rest.startsWith("(")) rest = rest.slice(1);   // 兼容 nmc 双层括号包裹
   while (rest.endsWith(")")) rest = rest.slice(0, -1);
   return JSON.parse(rest);
 }
