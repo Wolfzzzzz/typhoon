@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台风实时位置 · 巴威 BAVI</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; background: #0b1622; }
+  /* 信息面板 */
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 1000;
+    width: 320px; max-width: calc(100vw - 24px);
+    background: rgba(14,22,34,.92); color: #e8eef6; border: 1px solid #2a3a52;
+    border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(8px);
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); font-size: 13px;
+  }
+  #panel h1 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
+  #panel .en { color: #7fa8d6; font-size: 12px; font-weight: 400; }
+  .lvl-badge { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 12px; }
+  .cell { background: rgba(255,255,255,.04); border-radius: 8px; padding: 7px 9px; }
+  .cell .k { color: #8aa2bd; font-size: 11px; }
+  .cell .v { font-size: 15px; font-weight: 700; margin-top: 1px; }
+  .v.wind { color: #ff7a45; } .v.pres { color: #5ec8ff; }
+  .v.latlon { font-size: 13px; }
+  #status { margin-top: 10px; font-size: 11px; color: #7a90ab; line-height: 1.5; }
+  #status b { color: #9fd08a; }
+  .legend { position: absolute; bottom: 14px; left: 12px; z-index: 1000;
+    background: rgba(14,22,34,.9); border: 1px solid #2a3a52; border-radius: 10px;
+    padding: 9px 12px; color: #cdd9e8; font-size: 11px; line-height: 1.7; }
+  .legend i { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .btn { cursor: pointer; background:#1b2c44; border:1px solid #33507a; color:#cfe2ff;
+    border-radius:8px; padding:4px 10px; font-size:12px; }
+  .btn:hover { background:#274063; }
+  /* 脉冲点 */
+  .pulse { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff;
+    box-shadow: 0 0 0 rgba(255,80,80,.6); animation: pul 1.6s infinite; }
+  @keyframes pul { 0%{box-shadow:0 0 0 0 rgba(255,80,80,.7);} 70%{box-shadow:0 0 0 18px rgba(255,80,80,0);} 100%{box-shadow:0 0 0 0 rgba(255,80,80,0);} }
+  /* 移动箭头 */
+  .arrow { font-size: 22px; color:#ff5555; text-shadow:0 0 4px #000; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="panel">
+  <h1>🌀 <span id="cn">巴威</span> <span class="en" id="en">BAVI</span></h1>
+  <div style="margin-top:6px"><span class="lvl-badge" id="lvl">--</span>
+    <span style="font-size:11px;color:#8aa2bd;margin-left:6px" id="status-txt">加载中…</span></div>
+  <div class="grid">
+    <div class="cell"><div class="k">最大风速</div><div class="v wind" id="wind">-- m/s</div></div>
+    <div class="cell"><div class="k">中心气压</div><div class="v pres" id="pres">-- hPa</div></div>
+    <div class="cell"><div class="k">当前位置</div><div class="v latlon" id="latlon">--</div></div>
+    <div class="cell"><div class="k">移动</div><div class="v" id="move" style="font-size:13px">--</div></div>
+    <div class="cell"><div class="k">距昆山</div><div class="v" id="dist" style="font-size:14px">-- km</div></div>
+    <div class="cell"><div class="k">最新实况时刻</div><div class="v" id="obs" style="font-size:13px">--</div></div>
+  </div>
+  <div id="status"></div>
+  <div style="margin-top:10px;display:flex;gap:8px">
+    <span class="btn" id="refresh">↻ 立即刷新</span>
+    <span class="btn" id="layer">切换底图</span>
+    <span class="btn" id="fit">复位视图</span>
+  </div>
+</div>
+
+<div class="legend">
+  <div><span class="dot" style="background:#ff3b30"></span>当前位置（脉冲）</div>
+  <div><i style="border-color:#ff8c42"></i>实况轨迹（历史点连线）</div>
+  <div><i style="border-color:#5ec8ff;border-top-style:dashed"></i>官方预报路径（BABJ）</div>
+  <div><span class="dot" style="background:#ffd60a"></span>昆山（参照点）</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+// === 配置 ===
+const params = new URLSearchParams(location.search);
+const TY_ID = parseInt(params.get('id')) || 3257931;   // 默认巴威 BAVI；可加 ?id= 切换台风
+const KUNSHAN = [31.39, 120.98];          // 昆山
+const NMC_BASE = "https://typhoon.nmc.cn/weatherservice/typhoon/jsons";
+const LEVEL_CN = {
+  "TD":"热带低压", "TS":"热带风暴", "STS":"强热带风暴",
+  "TY":"台风", "STY":"强台风", "SuperTY":"超强台风",
+};
+const RADII_MAP = {"30KTS":"7", "50KTS":"10", "64KTS":"12"};
+
+let map, curLayer, altLayer, layers = {}, layerIdx = 0;
+const overlay = L.layerGroup();   // 轨迹/风圈/参照等所有叠加层
+
+function haversine(a, b) {
+  const R = 6371, toR = x => x * Math.PI / 180;
+  const dLat = toR(b[0]-a[0]), dLon = toR(b[1]-a[1]);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLon/2)**2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s)));
+}
+
+function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([28, 123], 5);
+  const gaode = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+    subdomains:'1234', maxZoom:18, className:'gmap' });
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { subdomains:'abc', maxZoom:19 });
+  const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:18 });
+  layers = { "高德地图": gaode, "OpenStreetMap": osm, "卫星影像": esri };
+  curLayer = gaode.addTo(map);
+  overlay.addTo(map);
+  // 参照：昆山
+  L.marker(KUNSHAN, { icon: L.divIcon({ className:'', html:'<div style="font-size:11px;color:#ffd60a;font-weight:700;text-shadow:0 0 3px #000;white-space:nowrap">📍昆山</div>', iconSize:[60,20], iconAnchor:[30,10] }) }).addTo(overlay);
+}
+
+function clearOverlay(){ overlay.clearLayers(); }
+
+function drawTrack(d) {
+  clearOverlay();
+  const pts = d.points || [];
+  const track = pts.map(p => [p.lat, p.lon]).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+
+  // 实况轨迹
+  if (track.length > 1) {
+    L.polyline(track, { color:'#ff8c42', weight:3, opacity:.9 }).addTo(overlay);
+    // 历史点小圆
+    track.forEach(p => L.circleMarker(p, { radius:2.5, color:'#ff8c42', fillColor:'#ffd9a0', fillOpacity:1, weight:1 }).addTo(overlay));
+  }
+
+  // 预报路径（虚线）
+  const fc = (d.forecast||[]).map(f => [f.lat, f.lon]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));
+  if (fc.length > 1) {
+    L.polyline(fc, { color:'#5ec8ff', weight:2.5, dashArray:'6,6', opacity:.85 }).addTo(overlay);
+    fc.forEach(f => L.circleMarker(f, { radius:3, color:'#5ec8ff', fillColor:'#cdeeff', fillOpacity:1, weight:1 }).addTo(overlay));
+  }
+
+  // 最新实况点
+  const last = pts[pts.length - 1];
+  if (last) {
+    const col = LEVEL_COLOR[last.level] || '#ff3b30';
+    // 风圈
+    Object.entries(last.radii||{}).forEach(([lv, r4]) => {
+      const rKm = Math.max(...r4) / 1; // 四向最大半径(km)
+      L.circle([last.lat, last.lon], { radius:rKm*1000, color:RADII_COLOR[lv]||'#aaa', weight:1, fillColor:RADII_COLOR[lv]||'#aaa', fillOpacity:.08, dashArray: lv==='7'?'2,4':null }).addTo(overlay);
+    });
+    // 脉冲标记
+    const m = L.marker([last.lat, last.lon], { icon: L.divIcon({ className:'', html:`<div class="pulse" style="background:${col}"></div>`, iconSize:[16,16], iconAnchor:[8,8] }) }).addTo(overlay);
+    // 移动方向箭头
+    const dir = last.move_dir || '';
+    if (dir) {
+      L.marker([last.lat, last.lon], { icon: L.divIcon({ className:'', html:`<div class="arrow">➤</div>`, iconSize:[22,22], iconAnchor:[11,11] }),
+        rotationAngle: 0 }).addTo(overlay);
+    }
+    m.bindPopup(`<b>${d.cn} ${d.en}</b><br>时刻 ${last.time}<br>等级 ${last.level_cn}<br>风速 ${last.wind} m/s · 气压 ${last.pressure} hPa<br>移动 ${dir} ${last.move_speed} km/h`).openPopup();
+  }
+
+  // 昆山标记 + 距离线已加
+  L.marker(KUNSHAN, { icon: L.divIcon({ className:'', html:'<div style="width:10px;height:10px;background:#ffd60a;border:2px solid #000;border-radius:50%"></div>', iconSize:[14,14], iconAnchor:[7,7] }) }).addTo(overlay);
+
+  return last;
+}
+
+function updatePanel(d, last) {
+  document.title = `台风实时位置 · ${d.cn} ${d.en}`;
+  document.getElementById('cn').textContent = d.cn || '巴威';
+  document.getElementById('en').textContent = d.en || 'BAVI';
+  const col = LEVEL_COLOR[last.level] || '#ff3b30';
+  const lvl = document.getElementById('lvl');
+  lvl.textContent = last.level_cn + '（' + last.level + '）';
+  lvl.style.background = col;
+  document.getElementById('wind').textContent = last.wind + ' m/s';
+  document.getElementById('pres').textContent = last.pressure + ' hPa';
+  document.getElementById('latlon').textContent = `${last.lat.toFixed(1)}°N, ${last.lon.toFixed(1)}°E`;
+  document.getElementById('move').textContent = `${last.move_dir} ${last.move_speed} km/h`;
+  const dist = haversine(KUNSHAN, [last.lat, last.lon]);
+  document.getElementById('dist').textContent = dist + ' km';
+  document.getElementById('obs').textContent = last.time;
+
+  const fcount = (d.forecast||[]).length;
+  const latestFc = (d.forecast||[]).slice(-1)[0];
+  document.getElementById('status-txt').textContent = '状态 ' + (d.status==='start'?'活动中':'已停编');
+  document.getElementById('status').innerHTML =
+    `数据来源：<b>中央气象台 (nmc)</b> 官方实况（前端直连）<br>` +
+    `轨迹历史点：<b>${d.points.length}</b> 个 · 预报时效：<b>${fcount}</b> 段` +
+    (latestFc ? `（最远至 +${latestFc.hour}h，${latestFc.time}）` : '') + `<br>` +
+    `更新于 <b>${new Date().toLocaleString('zh-CN')}</b> · 每 60 秒自动刷新`;
+}
+
+// === nmc 直连（无需后端）：fetch + JSONP 兜底 ===
+function unwrap(raw){
+  const i = raw.indexOf("(");
+  let rest = raw.slice(i + 1);
+  while (rest.endsWith(")")) rest = rest.slice(0, -1);
+  return JSON.parse(rest);
+}
+
+function parse_dt(ts){
+  try { return `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)} ${ts.slice(8,10)}:${ts.slice(10,12)}`; }
+  catch (e) { return ts; }
+}
+
+// 复刻原 proxy_server.py 的 parse_view（浏览器端）
+function parseView(data){
+  const t = data.typhoon;
+  const tid = t[0], en = t[1], cn = t[2];
+  const status = t.length > 7 ? t[7] : null;
+  const raw_pts = t.length > 8 ? t[8] : [];
+  const points = [];
+  for (const p of raw_pts){
+    try {
+      const radii = {};
+      for (const r of (p[10] || [])){
+        const label = RADII_MAP[r[0]] || r[0];
+        radii[label] = [r[1], r[2], r[3], r[4]];
+      }
+      points.push({
+        time: parse_dt(p[1]), ts: p[2], level: p[3],
+        level_cn: LEVEL_CN[p[3]] || p[3],
+        lon: p[4], lat: p[5], pressure: p[6], wind: p[7],
+        move_dir: p[8], move_speed: p[9], radii
+      });
+    } catch (e) { continue; }
+  }
+  let forecast = [];
+  if (raw_pts.length){
+    try {
+      const fc = raw_pts[raw_pts.length - 1][11] || {};
+      for (const f of (fc.BABJ || [])){
+        forecast.push({
+          hour: f[0], time: f[1], lon: f[2], lat: f[3],
+          pressure: f[4], wind: f[5], level: f[7],
+          level_cn: LEVEL_CN[f[7]] || f[7]
+        });
+      }
+    } catch (e) {}
+  }
+  return { id: tid, en, cn, status, points, forecast };
+}
+
+async function fetchTyphoon(tid){
+  const url = `${NMC_BASE}/view_${tid}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const raw = await res.text();
+    return parseView(unwrap(raw));
+  } catch (e) {
+    // 兜底：JSONP（无需 CORS）
+    return await jsonpFetch(tid);
+  }
+}
+
+function jsonpFetch(tid){
+  return new Promise((resolve, reject) => {
+    const cb = `typhoon_jsons_view_${tid}`;
+    const prev = window[cb];
+    const s = document.createElement("script");
+    window[cb] = function(data){
+      window[cb] = prev;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      resolve(parseView(data));
+    };
+    s.onerror = () => {
+      window[cb] = prev;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      reject(new Error("JSONP 失败"));
+    };
+    s.src = `${NMC_BASE}/view_${tid}`;
+    document.head.appendChild(s);
+  });
+}
+
+async function load() {
+  try {
+    const d = await fetchTyphoon(TY_ID);
+    const last = drawTrack(d);
+    updatePanel(d, last);
+  } catch (e) {
+    document.getElementById('status-txt').textContent = '加载失败：' + e.message;
+  }
+}
+
+// 控件
+document.getElementById('refresh').onclick = load;
+document.getElementById('layer').onclick = () => {
+  const names = Object.keys(layers); layerIdx = (layerIdx+1)%names.length;
+  map.removeLayer(curLayer); curLayer = layers[names[layerIdx]].addTo(map);
+};
+document.getElementById('fit').onclick = () => map.setView([28,123],5);
+
+initMap();
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
